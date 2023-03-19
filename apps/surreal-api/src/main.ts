@@ -1,23 +1,26 @@
-import Fastify from 'fastify';
-import { app } from './app/app';
+import { NestFactory } from '@nestjs/core';
+import { AppModule } from './app.module';
+import { ApolloServer } from '@apollo/server';
+import { startStandaloneServer } from '@apollo/server/standalone';
+import { mergeTypeDefs } from '@graphql-tools/merge';
+import { readFileSync } from 'fs';
 
-const host = process.env.HOST ?? 'localhost';
-const port = process.env.PORT ? Number(process.env.PORT) : 3000;
+const users = readFileSync('./src/users/users.graphql', 'utf8');
+const projects = readFileSync('./src/projects/projects.graphql', 'utf8');
 
-// Instantiate Fastify with some config
-const server = Fastify({
-  logger: true,
-});
+const mergedTypeDefs = mergeTypeDefs([users, projects]);
 
-// Register your application as a normal plugin.
-server.register(app);
+async function bootstrap() {
+  const app = await NestFactory.create(AppModule);
+  await app.listen(3000);
+  const server = new ApolloServer({
+    typeDefs: mergedTypeDefs,
+  });
+  const { url } = await startStandaloneServer(server, {
+    listen: { port: 4000 },
+  });
+  
+  console.log(`🚀  Server ready at: ${url}`);
+}
 
-// Start listening.
-server.listen({ port, host }, (err) => {
-  if (err) {
-    server.log.error(err);
-    process.exit(1);
-  } else {
-    console.log(`[ ready ] http://${host}:${port}`);
-  }
-});
+bootstrap();
